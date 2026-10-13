@@ -1,7 +1,14 @@
 /*
  * 공용 도우미(U)와 데이터 저장소(Store) — 브라우저 localStorage에 저장
  */
+// 흔한 성씨 + 이름 1~2자 → 실명처럼 보이는지 확인할 때 사용
+const SURNAMES = '김이박최정강조윤장임한오서신권황안송류유전홍고문양손배백허남심노하곽성차주우구민진나지엄채원천방공현함변염여추도소석선설마길연위표명기반왕금옥육인맹제모탁국어은편용';
+
 const U = {
+  looksLikeRealName(name) {
+    const n = String(name || '').trim();
+    return /^[가-힣]{3}$/.test(n) && SURNAMES.includes(n[0]);
+  },
   uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); },
   pad(n) { return String(n).padStart(2, '0'); },
   dayKey(d) { return Analysis.dayKey(d); },
@@ -63,10 +70,15 @@ const Store = (() => {
   function empty() {
     return { version: 1, students: [], behaviors: [], records: [], plans: [], settings: {} };
   }
+  // 개인정보 최소화: 예전 버전에서 저장된 생년월일 등은 지운다
+  function stripPersonal(d) {
+    for (const s of d.students || []) delete s.birth;
+    return d;
+  }
   function load() {
     try {
       const raw = localStorage.getItem(KEY);
-      if (raw) return Object.assign(empty(), JSON.parse(raw));
+      if (raw) return stripPersonal(Object.assign(empty(), JSON.parse(raw)));
     } catch (e) { console.error(e); }
     return empty();
   }
@@ -160,7 +172,7 @@ const Store = (() => {
       if (!d || !Array.isArray(d.students) || !Array.isArray(d.behaviors) || !Array.isArray(d.records)) {
         throw new Error('올바른 백업 파일이 아닙니다.');
       }
-      data = Object.assign(empty(), d);
+      data = stripPersonal(Object.assign(empty(), d));
       save();
     },
     reset() { data = empty(); save(); },
@@ -175,7 +187,7 @@ const Store = (() => {
     const pick = arr => arr[Math.floor(rnd() * arr.length)];
     const poisson = lam => { let L = Math.exp(-lam), k = 0, p = 1; do { k++; p *= rnd(); } while (p > L); return k - 1; };
 
-    const student = api.upsertStudent({ name: '김예시', grade: '3학년 2반', birth: '2017-05-14', info: '자폐스펙트럼장애, 구어 사용 가능(2~3어절)', notes: '예시 데이터입니다.' });
+    const student = api.upsertStudent({ name: '별님(예시)', grade: '3학년', info: '구어 사용 가능(2~3어절), 시각 자료 이해가 좋음', notes: '예시 데이터입니다.' });
     const today = U.today();
     const start = U.addDays(today, -41);
     const ivDate = U.addDays(today, -20);

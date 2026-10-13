@@ -70,8 +70,18 @@
     const cur = student();
     sel.innerHTML = list.length
       ? list.map(s => `<option value="${s.id}" ${cur && s.id === cur.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('') + '<option value="__new">+ 학생 추가</option>'
-      : '<option value="__new">학생을 추가하세요</option>';
+      : '<option value="__new">학생(가명) 추가</option>';
   }
+
+  const PRIVACY_NOTICE = `
+    <div class="privacy">
+      <b>🔒 개인정보를 입력하지 마세요</b>
+      <ul>
+        <li>학생 이름은 <b>가명</b>으로 적어 주세요. (예: 학생A, 별님, 3-1번)</li>
+        <li>생년월일·주소·연락처·학교명·보호자 이름 등은 입력받지 않습니다.</li>
+        <li>ABC 기록 등 서술란에도 실명 대신 '친구1', '담임' 같은 표현을 써 주세요.</li>
+      </ul>
+    </div>`;
 
   function needStudent() {
     if (student()) return '';
@@ -83,6 +93,7 @@
           <button class="btn primary" data-action="newStudent">학생 추가하기</button>
           <button class="btn" data-action="loadSample">예시 데이터로 둘러보기</button>
         </div>
+        ${PRIVACY_NOTICE}
         <p class="muted small">모든 자료는 이 브라우저에만 저장됩니다. 설정 메뉴에서 백업 파일로 내보낼 수 있어요.</p>
       </section>`;
   }
@@ -379,6 +390,7 @@
         <datalist id="settingList">${SETTING_OPTIONS.map(o => `<option value="${o}">`).join('')}</datalist>
         <datalist id="activityList">${ACTIVITY_OPTIONS.map(o => `<option value="${o}">`).join('')}</datalist>
 
+        <p class="muted small">🔒 서술란에는 실명 대신 '친구1', '담임', '보조인력'처럼 적어 주세요.</p>
         <fieldset class="abc-a"><legend><b>A</b> 선행사건 — 행동 직전에 무슨 일이 있었나요?</legend>
           <div class="checks">${checks(A.ANTECEDENTS, 'antecedents', abc.antecedents)}</div>
           <textarea name="antecedentText" rows="2" placeholder="구체적으로 (예: 수학 익힘책 3쪽을 풀자고 지시함)">${esc(abc.antecedentText || '')}</textarea>
@@ -401,7 +413,7 @@
             ${Object.entries(A.FUNCTIONS).map(([k, v]) => `<option value="${k}" ${abc.functionGuess === k ? 'selected' : ''}>${v}</option>`).join('')}
           </select>
         </label>
-        <label>메모 <textarea name="notes" rows="2">${esc(abc.notes || '')}</textarea></label>
+        <label>메모 <textarea name="notes" rows="2" placeholder="실명 대신 '친구1', '담임' 등으로 적어 주세요">${esc(abc.notes || '')}</textarea></label>
         <button class="btn primary" type="submit">${r ? '수정 저장' : 'ABC 기록 저장'}</button>
       </form>`;
   }
@@ -736,7 +748,6 @@
           <li>입력창에 붙여넣기(Ctrl+V / 길게 눌러 붙여넣기) 후 보냅니다.</li>
         </ol>
         <div class="row wrap">
-          <label class="check"><input type="checkbox" id="aiAnon" checked> 학생 이름을 '학생A'로 바꾸고 생년월일 제외</label>
           ${hasDraft ? '<label class="check"><input type="checkbox" id="aiDraft"> 위 계획서 초안도 함께 보내기</label>' : ''}
         </div>
         <div class="row wrap">
@@ -748,7 +759,7 @@
           ${custom.map(link).join('')}
           ${general.map(link).join('')}
         </div>
-        <p class="muted small">※ 익명 처리는 학생 이름만 바꿉니다. 서술 기록에 다른 사람 이름이나 학교명이 있다면 붙여넣기 전에 확인하세요. 학교·교육청의 AI 사용 지침을 따라 주세요.</p>
+        <p class="muted small">※ 앱에는 가명만 저장되어 있습니다. 서술 기록에 실명이나 학교명을 적지 않았는지 '미리보기'로 한 번 확인한 뒤 보내 주세요. 학교·교육청의 AI 사용 지침을 따라 주세요.</p>
       </section>`;
   }
   function aiText() {
@@ -756,11 +767,10 @@
     const b = behavior();
     const from = f.from.value, to = f.to.value;
     const an = A.analyze(b, S.records(b.id), { from: from <= to ? from : to, to });
-    const anonEl = $('#aiAnon'), draftEl = $('#aiDraft');
+    const draftEl = $('#aiDraft');
     const doc = $('#planDoc');
     return Export.build({
       student: student(), behavior: b, analysis: an,
-      anonymize: !anonEl || anonEl.checked,
       draftText: draftEl && draftEl.checked && doc ? doc.innerText : '',
     });
   }
@@ -849,13 +859,13 @@
         <h2>${isNew ? '학생 추가' : '학생 정보 수정'}</h2>
         <form data-form="student" class="form">
           <input type="hidden" name="id" value="${isNew ? '' : s.id}">
+          ${PRIVACY_NOTICE}
           <div class="two">
-            <label>이름 <input name="name" required value="${esc(s.name || '')}"></label>
-            <label>학년/반 <input name="grade" value="${esc(s.grade || '')}" placeholder="예: 3학년 2반"></label>
+            <label>가명 <small class="muted">(실명 대신 별칭)</small><input name="name" required maxlength="20" value="${esc(s.name || '')}" placeholder="예: 학생A, 별님"></label>
+            <label>학년 <small class="muted">(선택)</small><input name="grade" maxlength="20" value="${esc(s.grade || '')}" placeholder="예: 3학년"></label>
           </div>
-          <label>생년월일 <input type="date" name="birth" value="${esc(s.birth || '')}"></label>
-          <label>특성·진단 <input name="info" value="${esc(s.info || '')}" placeholder="예: 자폐스펙트럼장애, 구어 사용 가능"></label>
-          <label>메모 <textarea name="notes" rows="3">${esc(s.notes || '')}</textarea></label>
+          <label>참고 특성 <small class="muted">(선택 · 의사소통 수준, 좋아하는 것, 강점 등)</small><input name="info" value="${esc(s.info || '')}" placeholder="예: 2~3어절 구어 사용, 시각 자료 이해가 좋음, 블록 놀이 좋아함"></label>
+          <label>메모 <small class="muted">(선택)</small><textarea name="notes" rows="3" placeholder="개인을 알아볼 수 있는 정보는 적지 마세요">${esc(s.notes || '')}</textarea></label>
           <div class="row">
             <button class="btn primary" type="submit">저장</button>
             <button class="btn" type="button" data-action="cancelStudent">취소</button>
@@ -1072,7 +1082,8 @@
   const Forms = {
     student(f) {
       const fd = new FormData(f);
-      const obj = Object.fromEntries(['name', 'grade', 'birth', 'info', 'notes'].map(k => [k, (fd.get(k) || '').trim()]));
+      const obj = Object.fromEntries(['name', 'grade', 'info', 'notes'].map(k => [k, (fd.get(k) || '').trim()]));
+      if (U.looksLikeRealName(obj.name) && !confirm(`'${obj.name}'은(는) 실명처럼 보입니다.\n개인정보 보호를 위해 가명(예: 학생A, 별님) 사용을 권장합니다.\n\n가명이 맞으면 [확인], 고치려면 [취소]를 누르세요.`)) return;
       if (fd.get('id')) obj.id = fd.get('id');
       const s = S.upsertStudent(obj);
       S.setSetting('studentId', s.id);

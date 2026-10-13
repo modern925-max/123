@@ -1,6 +1,7 @@
 /*
  * AI 챗봇(Gemini 젬, ChatGPT GPT 등)에 붙여넣을 분석 자료 텍스트 생성 (브라우저/Node 공용)
  * 앱은 API를 호출하지 않으며, 사용자가 자신의 AI 계정에 직접 붙여넣는다.
+ * 앱에는 처음부터 가명만 저장하므로 내보내는 자료에도 실명이 없다.
  */
 (function (root, factory) {
   const isNode = typeof module === 'object' && module.exports;
@@ -19,25 +20,14 @@
   function pad(n) { return String(n).padStart(2, '0'); }
   function timeOf(ts) { const d = new Date(ts); return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
 
-  // 이름 익명화: 서술 기록 안에 나온 이름도 함께 바꾼다
-  function makeAnonymizer(name, alias) {
-    const n = String(name || '').trim();
-    if (!n) return s => s;
-    const variants = [n];
-    if (n.length === 3) variants.push(n.slice(1)); // 성을 뺀 이름(예: 김민수 → 민수)
-    const re = new RegExp(variants.map(v => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g');
-    return s => String(s == null ? '' : s).replace(re, alias);
-  }
-
   /**
-   * @param ctx { student, behavior, analysis, anonymize, maxAbc, draftText }
+   * 앱에는 가명만 입력하도록 안내하므로 별도 익명화는 하지 않는다.
+   * @param ctx { student, behavior, analysis, maxAbc, draftText }
    */
   function build(ctx) {
     const { student = {}, behavior = {}, analysis: an } = ctx;
-    const anonymize = ctx.anonymize !== false;
-    const alias = '학생A';
-    const anon = anonymize ? makeAnonymizer(student.name, alias) : s => String(s == null ? '' : s);
-    const name = anonymize ? alias : (student.name || '학생');
+    const anon = s => String(s == null ? '' : s);
+    const name = student.name || '학생';
     const s = an.summary;
     const fn = an.fn;
     const L = [];
@@ -46,9 +36,8 @@
     L.push('※ 행동중재 도우미 앱에서 내보낸 관찰 자료입니다. 아래 자료를 근거로 행동중재계획서(BIP)를 작성해 주세요.');
     L.push('');
     L.push('## 1. 학생 정보');
-    L.push(`- 학생: ${name}${student.grade ? ` (${student.grade})` : ''}`);
-    if (student.info) L.push(`- 특성·진단: ${anon(student.info)}`);
-    if (!anonymize && student.birth) L.push(`- 생년월일: ${student.birth}`);
+    L.push(`- 학생(가명): ${name}${student.grade ? ` (${student.grade})` : ''}`);
+    if (student.info) L.push(`- 참고 특성: ${anon(student.info)}`);
     L.push('');
     L.push('## 2. 표적행동');
     L.push(`- 행동명: ${anon(behavior.name)}`);
@@ -133,9 +122,9 @@
     L.push('2) 특히 ABC 원자료의 서술 내용을 근거로 행동 기능 가설을 세우고, 근거가 된 기록을 인용해 주세요.');
     L.push('3) 계획서는 기본 정보, 표적행동, 현행 수준, 기능평가 결과와 가설, 목표(단기·장기), 예방 전략, 대체행동 교수, 후속결과 전략, 위기행동 관리, 자료 수집·평가 계획 순서로 작성해 주세요.');
     L.push('4) 체벌·혐오 자극·불필요한 신체 제지는 권하지 말고, 의학적 진단이나 약물 권고는 하지 마세요.');
-    if (anonymize) L.push(`5) 학생 이름은 '${alias}'로 표기해 주세요.`);
+    L.push(`5) 학생은 가명 '${name}'(으)로 표기하고, 실명 등 개인정보는 묻지 마세요.`);
     return L.join('\n');
   }
 
-  return { build, makeAnonymizer };
+  return { build };
 });

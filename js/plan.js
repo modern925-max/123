@@ -242,10 +242,10 @@
 
   <h2>1. 기본 정보</h2>
   <table>
-    <tr><th>학생명</th><td>${esc(name)}</td><th>학년/반</th><td>${esc(student.grade || '')}</td></tr>
-    <tr><th>생년월일</th><td>${esc(student.birth || '')}</td><th>작성일</th><td>${fmtDate(today)}</td></tr>
-    <tr><th>작성자</th><td>${esc(ctx.author || '')}</td><th>분석 기간</th><td>${fmtDate(an.from)} ~ ${fmtDate(an.to)}</td></tr>
-    <tr><th>특성·진단</th><td colspan="3">${esc(student.info || '')}</td></tr>
+    <tr><th>학생(가명)</th><td>${esc(name)}</td><th>학년</th><td>${esc(student.grade || '')}</td></tr>
+    <tr><th>작성자</th><td>${esc(ctx.author || '')}</td><th>작성일</th><td>${fmtDate(today)}</td></tr>
+    <tr><th>분석 기간</th><td colspan="3">${fmtDate(an.from)} ~ ${fmtDate(an.to)}</td></tr>
+    <tr><th>참고 특성</th><td colspan="3">${esc(student.info || '')}</td></tr>
   </table>
 
   <h2>2. 표적행동</h2>
