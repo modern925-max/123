@@ -93,3 +93,24 @@ test('Plan.generate: 사용자 입력은 HTML 이스케이프된다', () => {
   const html = Plan.generate({ student: { name: '<script>x</script>' }, behavior: { name: 'b' }, analysis: an });
   assert.ok(!html.includes('<script>'));
 });
+
+const Export = require('../js/export.js');
+
+test('Export.build: 익명화하고 ABC 원자료와 요청을 포함한다', () => {
+  const recs = [
+    { ts: ts('2026-10-05', '09:10'), durationSec: 90, intensity: 3, abc: { setting: '교실', activity: '수학', antecedents: ['demand'], antecedentText: '김민수에게 익힘책을 주자', behaviorText: '민수가 소리를 지름', consequences: ['task_removed'], consequenceText: '', functionGuess: 'escape', notes: '' } },
+    { ts: ts('2026-10-06', '10:00') },
+  ];
+  const behavior = { name: '소리 지르기', definition: '큰 소리', measures: ['frequency', 'abc'], interventionDate: '' };
+  const an = A.analyze(behavior, recs, { from: '2026-10-05', to: '2026-10-09' });
+  const txt = Export.build({ student: { name: '김민수', grade: '3-2', birth: '2017-01-01' }, behavior, analysis: an });
+  assert.ok(!txt.includes('김민수'));
+  assert.ok(!txt.includes('민수'));
+  assert.ok(!txt.includes('2017-01-01'));
+  assert.ok(txt.includes('학생A에게 익힘책을 주자'));
+  assert.ok(txt.includes('B: 학생A가 소리를 지름'));
+  assert.ok(txt.includes('## 6. ABC 기록 원자료'));
+  assert.ok(txt.includes('## 요청'));
+  const named = Export.build({ student: { name: '김민수', birth: '2017-01-01' }, behavior, analysis: an, anonymize: false });
+  assert.ok(named.includes('김민수') && named.includes('2017-01-01'));
+});

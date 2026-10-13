@@ -701,6 +701,7 @@
         </div>
       </section>
       <section class="card paper"><div id="planDoc" contenteditable="true" spellcheck="false">${draft.html}</div></section>` : ''}
+      ${aiCard(!!draft)}
       <section class="card no-print">
         <h3>저장된 계획서</h3>
         ${saved.length ? `<ul class="rec-list">${saved.map(p => `<li><div class="rec-main">
@@ -709,6 +710,83 @@
           <button class="icon-btn danger" data-action="deletePlan" data-id="${p.id}">🗑</button></div></li>`).join('')}</ul>` : '<p class="muted">저장된 계획서가 없습니다.</p>'}
       </section>`;
   };
+
+  // ---------- AI 챗봇 연결 (API 키 없이, 사용자 본인의 AI 계정 사용) ----------
+  const GENERAL_CHATBOTS = [
+    { name: 'Gemini', url: 'https://gemini.google.com/app' },
+    { name: 'ChatGPT', url: 'https://chatgpt.com/' },
+    { name: 'Claude', url: 'https://claude.ai/new' },
+  ];
+  function chatbotLinks() {
+    const custom = ((window.APP_CONFIG && window.APP_CONFIG.chatbots) || []).filter(c => c && c.url);
+    const mine = S.setting('chatbot');
+    if (mine && mine.url) custom.push({ name: mine.name || '내 챗봇', url: mine.url });
+    return { custom, general: GENERAL_CHATBOTS };
+  }
+  function aiCard(hasDraft) {
+    const { custom, general } = chatbotLinks();
+    const link = c => `<a class="btn ${custom.includes(c) ? 'primary' : ''}" href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.name)} 열기 ↗</a>`;
+    return `
+      <section class="card no-print ai-card">
+        <h3>🤖 AI 챗봇으로 계획서 다듬기 <small class="muted">(API 키·추가 비용 없음)</small></h3>
+        <p class="muted small">위에서 정한 분석 기간의 자료와 ABC 서술 기록을 정리해 복사합니다. 평소 쓰는 AI 챗봇에 붙여넣으면 본인 계정으로 계획서를 작성해 줍니다.</p>
+        <ol class="steps">
+          <li><b>자료 복사</b>를 누릅니다.</li>
+          <li>${custom.length ? '미리 만들어 둔 <b>챗봇</b>' : '<b>AI 챗봇</b>'}을 엽니다.</li>
+          <li>입력창에 붙여넣기(Ctrl+V / 길게 눌러 붙여넣기) 후 보냅니다.</li>
+        </ol>
+        <div class="row wrap">
+          <label class="check"><input type="checkbox" id="aiAnon" checked> 학생 이름을 '학생A'로 바꾸고 생년월일 제외</label>
+          ${hasDraft ? '<label class="check"><input type="checkbox" id="aiDraft"> 위 계획서 초안도 함께 보내기</label>' : ''}
+        </div>
+        <div class="row wrap">
+          <button class="btn primary" data-action="copyAi">📋 자료 복사</button>
+          <button class="btn" data-action="previewAi">미리보기</button>
+          <button class="btn" data-action="downloadAi">⬇ 텍스트 파일</button>
+        </div>
+        <div class="row wrap ai-links">
+          ${custom.map(link).join('')}
+          ${general.map(link).join('')}
+        </div>
+        <p class="muted small">※ 익명 처리는 학생 이름만 바꿉니다. 서술 기록에 다른 사람 이름이나 학교명이 있다면 붙여넣기 전에 확인하세요. 학교·교육청의 AI 사용 지침을 따라 주세요.</p>
+      </section>`;
+  }
+  function aiText() {
+    const f = document.querySelector('form[data-form="plan"]');
+    const b = behavior();
+    const from = f.from.value, to = f.to.value;
+    const an = A.analyze(b, S.records(b.id), { from: from <= to ? from : to, to });
+    const anonEl = $('#aiAnon'), draftEl = $('#aiDraft');
+    const doc = $('#planDoc');
+    return Export.build({
+      student: student(), behavior: b, analysis: an,
+      anonymize: !anonEl || anonEl.checked,
+      draftText: draftEl && draftEl.checked && doc ? doc.innerText : '',
+    });
+  }
+  function copyText(text) {
+    const fallback = () => {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      ta.remove();
+      return ok;
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text).then(() => true, () => fallback());
+    }
+    return Promise.resolve(fallback());
+  }
+  function previewAi(text, note) {
+    openModal(`<h2>AI 챗봇에 보낼 자료</h2>
+      ${note ? `<p class="warn">${note}</p>` : ''}
+      <textarea class="ai-preview" readonly>${esc(text)}</textarea>
+      <div class="row"><button class="btn primary" data-action="copyAi">📋 복사</button><span class="muted small">${text.length.toLocaleString()}자</span></div>`);
+  }
 
   function currentPlanHtml() {
     const doc = $('#planDoc');
@@ -728,6 +806,17 @@
           <span class="muted small">표적행동 ${S.behaviors(s.id).length}개</span><span class="spacer"></span>
           <button class="btn small" data-action="editStudent" data-id="${s.id}">수정</button>
           <button class="icon-btn danger" data-action="deleteStudent" data-id="${s.id}">🗑</button></div></li>`).join('')}</ul>` : '<p class="muted">등록된 학생이 없습니다.</p>'}
+      </section>
+      <section class="card">
+        <h2>AI 챗봇 연결</h2>
+        <p class="muted">중재계획 화면의 '자료 복사' 후 바로 열 챗봇 링크입니다. 직접 만든 Gemini 젬이나 ChatGPT GPT의 공유 링크를 넣으세요.</p>
+        <div class="form">
+          <div class="two">
+            <label>이름 <input id="chatbotName" value="${esc((S.setting('chatbot') || {}).name || '')}" placeholder="예: 우리 학교 행동중재 젬"></label>
+            <label>링크 <input id="chatbotUrl" value="${esc((S.setting('chatbot') || {}).url || '')}" placeholder="https://gemini.google.com/gem/..."></label>
+          </div>
+          <div><button class="btn" data-action="saveChatbot">저장</button></div>
+        </div>
       </section>
       <section class="card">
         <h2>데이터 관리</h2>
@@ -927,6 +1016,25 @@
       if (!confirm('저장된 계획서를 삭제할까요?')) return;
       S.deletePlan(el.dataset.id);
       if (state.plan && state.plan.savedId === el.dataset.id) state.plan.savedId = null;
+      render();
+    },
+
+    copyAi() {
+      const inModal = $('.ai-preview');
+      const text = inModal ? inModal.value : aiText();
+      copyText(text).then(ok => {
+        if (ok) toast('복사했습니다. AI 챗봇에 붙여넣으세요.');
+        else previewAi(text, '자동 복사가 안 되는 환경입니다. 아래 글을 모두 선택(Ctrl+A)하여 복사하세요.');
+      });
+    },
+    previewAi() { previewAi(aiText()); },
+    downloadAi() { U.download(`AI요청자료_${behavior().name}_${U.today()}.txt`, aiText(), 'text/plain;charset=utf-8'); },
+    saveChatbot() {
+      const name = $('#chatbotName').value.trim();
+      const url = $('#chatbotUrl').value.trim();
+      if (url && !/^https:\/\//.test(url)) { alert('https:// 로 시작하는 링크를 입력하세요.'); return; }
+      S.setSetting('chatbot', url ? { name, url } : null);
+      toast(url ? '챗봇 링크를 저장했습니다.' : '챗봇 링크를 지웠습니다.');
       render();
     },
 
