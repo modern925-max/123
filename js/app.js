@@ -26,6 +26,7 @@
     lastRecordId: null,
     editBehavior: null, // null | 'new' | behaviorId
     editStudent: null,  // null | 'new' | studentId
+    csvImport: null,    // CSV 불러오기 미리보기 결과
     template: null,
   };
   let charts = [];
@@ -92,6 +93,7 @@
         <div class="row center">
           <button class="btn primary" data-action="newStudent">학생 추가하기</button>
           <button class="btn" data-action="loadSample">예시 데이터로 둘러보기</button>
+          <label class="btn">⬆ CSV 기록 불러오기<input type="file" accept=".csv,text/csv" data-change="importCsv" hidden></label>
         </div>
         ${PRIVACY_NOTICE}
         <p class="muted small">모든 자료는 이 브라우저에만 저장됩니다. 설정 메뉴에서 백업 파일로 내보낼 수 있어요.</p>
@@ -120,6 +122,7 @@
     if (r.durationSec) out.push(`<span class="badge">⏱ ${U.fmtDur(r.durationSec)}</span>`);
     if (r.intensity) out.push(`<span class="badge lvl${r.intensity}">강도 ${r.intensity}</span>`);
     if (r.abc) out.push('<span class="badge abc">ABC</span>');
+    if (r.timeUnknown) out.push('<span class="badge">시각 미상</span>');
     return out.join('');
   }
   function recordList(recs, opts = {}) {
@@ -839,6 +842,14 @@
           <button class="btn danger" data-action="resetData">전체 초기화</button>
         </div>
       </section>
+      <section class="card">
+        <h2>CSV 기록 불러오기</h2>
+        <p class="muted small">엑셀·구글 시트로 정리한 행동 기록을 CSV로 저장해 올리면 앱에 바로 들어갑니다. 첫 줄에 열 이름(학생, 표적행동, 날짜, 시작시간, 지속시간, 강도, 선행사건, 후속결과 등)이 있어야 하며, 순서는 상관없습니다. 이미 있는 기록은 다시 넣지 않습니다.</p>
+        <div class="row wrap">
+          <label class="btn primary">⬆ CSV 기록 불러오기<input type="file" accept=".csv,text/csv" data-change="importCsv" hidden></label>
+          <button class="btn" data-action="csvTemplate">⬇ CSV 양식 받기</button>
+        </div>
+      </section>
       <section class="card tip">
         <h3>사용 순서</h3>
         <ol>
@@ -896,6 +907,47 @@
     }
     const csv = rows.map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
     U.download(`행동기록_${U.today()}.csv`, '﻿' + csv, 'text/csv;charset=utf-8');
+  }
+
+  // 엑셀에서 저장한 CSV는 UTF-8 또는 EUC-KR(CP949)일 수 있다
+  function decodeText(buf) {
+    try { return new TextDecoder('utf-8', { fatal: true }).decode(buf); }
+    catch (e) { return new TextDecoder('euc-kr').decode(buf); }
+  }
+
+  function csvPreview(fileName, res) {
+    if (res.error) {
+      openModal(`<h2>CSV를 불러올 수 없습니다</h2><p class="warn">${esc(res.error)}</p>
+        <p class="muted small">'CSV 양식 받기'로 받은 파일의 첫 줄과 같은 열 이름을 쓰면 됩니다.</p>`);
+      return;
+    }
+    const realNames = res.students.filter(s => U.looksLikeRealName(s.name));
+    const byBeh = {};
+    for (const r of res.records) byBeh[r.behaviorId] = (byBeh[r.behaviorId] || 0) + 1;
+    const allBeh = S.data.behaviors.concat(res.behaviors);
+    const allStu = S.data.students.concat(res.students);
+    const rows = Object.entries(byBeh).map(([id, n]) => {
+      const b = allBeh.find(x => x.id === id);
+      const s = allStu.find(x => x.id === b.studentId);
+      const isNew = res.behaviors.includes(b);
+      return `<tr><td>${esc(s.name)}</td><td>${esc(b.name)} ${isNew ? '<span class="badge abc">새로 만듦</span>' : ''}</td><td class="num">${n}건</td></tr>`;
+    }).join('');
+    openModal(`
+      <h2>CSV 기록 불러오기</h2>
+      <p class="muted small">${esc(fileName)} · ${res.rows}줄 읽음</p>
+      ${res.records.length ? `<p><b>${res.records.length}건</b>을 불러옵니다. (${res.from} ~ ${res.to})</p>
+      <table class="import-table"><tr><th>학생</th><th>표적행동</th><th>기록</th></tr>${rows}</table>` : '<p class="warn">새로 불러올 기록이 없습니다.</p>'}
+      <ul class="import-notes">
+        ${res.duplicates ? `<li>이미 앱에 있는 기록 ${res.duplicates}건은 건너뜁니다.</li>` : ''}
+        ${res.noTime ? `<li>시작시간이 비어 있는 ${res.noTime}건은 낮 12시로 저장하고, 시간대 분석에서는 뺍니다.</li>` : ''}
+        ${res.skipped.length ? `<li>읽지 못한 줄 ${res.skipped.length}개:<br>${res.skipped.slice(0, 8).map(x => `${x.line}번째 줄 — ${esc(x.reason)}`).join('<br>')}${res.skipped.length > 8 ? '<br>…' : ''}</li>` : ''}
+        ${res.behaviors.length ? '<li>새로 만든 표적행동은 <b>표적행동</b> 메뉴에서 조작적 정의와 중재 시작일을 채워 주세요.</li>' : ''}
+      </ul>
+      ${realNames.length ? `<p class="warn">🔒 실명처럼 보이는 이름이 있습니다: ${realNames.map(s => esc(s.name)).join(', ')}. 가능하면 CSV에서 가명으로 바꾼 뒤 다시 불러와 주세요.</p>` : ''}
+      <div class="row">
+        ${res.records.length ? '<button class="btn primary" data-action="confirmCsvImport">불러오기</button>' : ''}
+        <button class="btn" data-action="closeModal">취소</button>
+      </div>`);
   }
 
   // ======================== 이벤트 ========================
@@ -1050,6 +1102,18 @@
 
     exportData() { U.download(`행동중재도우미_백업_${U.today()}.json`, S.exportJSON(), 'application/json'); },
     exportCsv: csvExport,
+    csvTemplate() { U.download('행동기록_양식.csv', '\ufeff' + CsvImport.TEMPLATE, 'text/csv;charset=utf-8'); },
+    confirmCsvImport() {
+      const res = state.csvImport;
+      if (!res) return;
+      S.applyImport(res);
+      state.csvImport = null;
+      state.plan = null;
+      closeModal();
+      toast(`기록 ${res.records.length}건을 불러왔습니다.`);
+      state.graphRange = 'all';
+      go('graph');
+    },
     resetData() {
       if (!confirm('모든 학생·표적행동·기록·계획서를 삭제할까요? 되돌릴 수 없습니다.')) return;
       if (!confirm('정말 삭제할까요? 백업하지 않은 자료는 복구할 수 없습니다.')) return;
@@ -1068,6 +1132,20 @@
       render();
     },
     calMetric(el) { state.calMetric = el.value; render(); },
+    importCsv(el) {
+      const file = el.files[0];
+      el.value = '';
+      if (!file) return;
+      file.arrayBuffer().then(buf => {
+        const res = CsvImport.prepare(decodeText(buf), S.data, {
+          uid: U.uid,
+          defaultStudent: student() && student().name,
+          defaultBehavior: behavior() && behavior().name,
+        });
+        state.csvImport = res.error || !res.records.length ? null : res;
+        csvPreview(file.name, res);
+      });
+    },
     importData(el) {
       const file = el.files[0];
       if (!file) return;

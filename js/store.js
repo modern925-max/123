@@ -1,8 +1,8 @@
 /*
  * 공용 도우미(U)와 데이터 저장소(Store) — 브라우저 localStorage에 저장
  */
-// 흔한 성씨 + 이름 1~2자 → 실명처럼 보이는지 확인할 때 사용
-const SURNAMES = '김이박최정강조윤장임한오서신권황안송류유전홍고문양손배백허남심노하곽성차주우구민진나지엄채원천방공현함변염여추도소석선설마길연위표명기반왕금옥육인맹제모탁국어은편용';
+// 흔한 성씨(상위 약 60개) + 이름 2자 → 실명처럼 보이는지 확인할 때 사용
+const SURNAMES = '김이박최정강조윤장임한오서신권황안송류유전홍고문양손배백허남심노하곽성차주우구민진나지엄채원천방공현함변염여추도소석선설';
 
 const U = {
   looksLikeRealName(name) {
@@ -164,6 +164,23 @@ const Store = (() => {
     plan(id) { return data.plans.find(p => p.id === id); },
     addPlan(p) { return upsert(data.plans, p); },
     deletePlan(id) { data.plans = data.plans.filter(p => p.id !== id); save(); },
+
+    // ---- CSV 불러오기 (CsvImport.prepare 결과 저장) ----
+    applyImport(res) {
+      for (const s of res.students) data.students.push(s);
+      for (const b of res.behaviors) {
+        const { colorIndex, ...rest } = b;
+        data.behaviors.push(Object.assign(rest, { color: COLORS[colorIndex % COLORS.length], intensityScale: DEFAULT_INTENSITY.slice() }));
+      }
+      for (const [id, measures] of Object.entries(res.behaviorUpdates)) {
+        const b = data.behaviors.find(x => x.id === id);
+        if (b) b.measures = measures;
+      }
+      for (const r of res.records) data.records.push(r);
+      const first = res.records[0] && data.behaviors.find(b => b.id === res.records[0].behaviorId);
+      if (first) { data.settings.studentId = first.studentId; data.settings.behaviorId = first.id; }
+      save();
+    },
 
     // ---- 백업 ----
     exportJSON() { return JSON.stringify(data, null, 2); },

@@ -254,6 +254,13 @@ fieldset > label.check { display: inline-flex; }
 .ai-links .btn { text-decoration: none; }
 .ai-preview { width: 100%; height: 50vh; font: 13px/1.5 ui-monospace, Menlo, Consolas, monospace; padding: 10px; border: 1px solid var(--line); border-radius: 10px; margin: 8px 0; }
 
+/* ---------- CSV 불러오기 ---------- */
+.import-table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 14px; }
+.import-table th, .import-table td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: left; }
+.import-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.import-notes { font-size: 14px; padding-left: 20px; color: #495057; }
+.card h3 + p.muted { margin-top: 0; }
+
 /* ---------- 모달 / 토스트 ---------- */
 .modal {
   position: fixed; inset: 0; background: rgba(15, 20, 30, .45); z-index: 50;

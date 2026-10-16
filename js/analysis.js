@@ -246,7 +246,7 @@
 
   function hourDist(records) {
     const h = new Array(24).fill(0);
-    for (const r of records) h[new Date(r.ts).getHours()]++;
+    for (const r of records) if (!r.timeUnknown) h[new Date(r.ts).getHours()]++; // 시각을 모르는 기록은 제외
     return h;
   }
   function weekdayDist(records) {
