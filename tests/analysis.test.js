@@ -120,3 +120,62 @@ test('looksLikeRealName: 실명처럼 보이는 이름을 구별한다', () => {
   assert.strictEqual(U.looksLikeRealName('별님'), false);
   assert.strictEqual(U.looksLikeRealName('별님(예시)'), false);
 });
+
+const CsvImport = require('../js/csv-import.js');
+
+test('CsvImport: 시간·지속시간·날짜 형식을 해석한다', () => {
+  assert.strictEqual(CsvImport.parseDate('2026-04-01 (수)'), '2026-04-01');
+  assert.strictEqual(CsvImport.parseDate('2026. 4. 1.'), '2026-04-01');
+  assert.strictEqual(CsvImport.parseDate('2026-02-30'), null);
+  assert.strictEqual(CsvImport.parseTime('9:10'), 550);
+  assert.strictEqual(CsvImport.parseTime('오전 10:40'), 640);
+  assert.strictEqual(CsvImport.parseTime('오후 12:45'), 765);
+  assert.strictEqual(CsvImport.parseTime('오후 1:05'), 785);
+  assert.strictEqual(CsvImport.parseTime('13:16'), 796);
+  assert.strictEqual(CsvImport.parseTime(''), null);
+  assert.strictEqual(CsvImport.parseDuration('0시 05분'), 300);
+  assert.strictEqual(CsvImport.parseDuration('2시 20분'), 8400);
+  assert.strictEqual(CsvImport.parseDuration('0시 00분'), 0);
+  assert.strictEqual(CsvImport.parseDuration('5분 30초'), 330);
+  assert.strictEqual(CsvImport.parseDuration('90', 'sec'), 90);
+  assert.strictEqual(CsvImport.parseDuration(''), null);
+  assert.strictEqual(CsvImport.parseFunction('회피·도피'), 'escape');
+});
+
+test('CsvImport.prepare: 기록표를 학생·행동·ABC 기록으로 바꾸고 중복은 건너뛴다', () => {
+  const csv = [
+    '학생,표적행동,날짜,시작시간,종료시간,지속시간,강도,장소,활동,선행사건,선행사건 상세,행동 묘사,후속결과,후속결과 상세,추정 기능,메모',
+    '마이노,위기행동,2026-04-01 (수),9:10,11:30,2시 20분,4,교실,체육,과제·지시 제시,컨디션 난조,양 주먹으로 때림,과제 감소·지연·대신 해 줌,진정영역으로 분리,회피·도피,',
+    '마이노,위기행동,2026-04-06 (월),오전 10:40,오전 10:45,,2,교실,일상생활,과제·지시 제시,없음,양 주먹으로 때림,자리·교실에서 분리,진정영역에서 휴식,회피·도피,',
+    '마이노,위기행동,2026-08-20 (목),,,0시 00분,3,교실,수학,소음·감각 자극 과다,착석 거부,양 주먹으로 때림,자리·교실에서 분리,,회피·도피,',
+    '마이노,위기행동,날짜없음,9:00,,,3,,,,,,,,,',
+  ].join('\r\n');
+  const res = CsvImport.prepare(csv, { students: [], behaviors: [], records: [] });
+  assert.strictEqual(res.records.length, 3);
+  assert.deepStrictEqual(res.students.map(s => s.name), ['마이노']);
+  assert.deepStrictEqual(res.behaviors.map(b => b.name), ['위기행동']);
+  assert.strictEqual(res.skipped.length, 1);
+  assert.strictEqual(res.skipped[0].line, 5);
+  const [r1, r2, r3] = res.records;
+  assert.strictEqual(r1.durationSec, 8400);
+  assert.strictEqual(r1.intensity, 4);
+  assert.deepStrictEqual(r1.abc.antecedents, ['demand']);
+  assert.deepStrictEqual(r1.abc.consequences, ['task_reduced']);
+  assert.strictEqual(r1.abc.functionGuess, 'escape');
+  assert.strictEqual(r2.durationSec, 300); // 지속시간이 비면 시작~종료로 계산
+  assert.strictEqual(r2.abc.antecedentText, ''); // '없음'은 빈칸으로
+  assert.strictEqual(r3.timeUnknown, true);
+  assert.strictEqual(r3.durationSec, undefined);
+  assert.strictEqual(res.noTime, 1);
+  assert.deepStrictEqual(res.behaviorUpdates[res.behaviors[0].id], ['frequency', 'duration', 'intensity', 'abc']);
+
+  const again = CsvImport.prepare(csv, { students: res.students, behaviors: res.behaviors, records: res.records });
+  assert.strictEqual(again.records.length, 0);
+  assert.strictEqual(again.duplicates, 3);
+  assert.strictEqual(again.students.length, 0);
+});
+
+test('CsvImport.prepare: 날짜 열이 없으면 안내한다', () => {
+  const res = CsvImport.prepare('학생,강도\nA,3', { students: [], behaviors: [], records: [] });
+  assert.ok(res.error.includes('날짜'));
+});
