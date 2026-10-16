@@ -39,7 +39,8 @@ const U = {
     a.download = filename;
     document.body.appendChild(a);
     a.click();
-    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+    // 바로 해제하면 일부 브라우저에서 파일 이름이 사라지므로 잠시 뒤 정리한다
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
   },
 };
 

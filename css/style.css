@@ -261,6 +261,11 @@ fieldset > label.check { display: inline-flex; }
 .import-notes { font-size: 14px; padding-left: 20px; color: #495057; }
 .card h3 + p.muted { margin-top: 0; }
 
+.csv-guide { margin-top: 12px; font-size: 14px; }
+.csv-guide summary { cursor: pointer; color: var(--primary); font-weight: 600; }
+.csv-guide ul { padding-left: 20px; margin: 8px 0; display: grid; gap: 4px; }
+.link-btn { border: 0; background: none; padding: 0; color: var(--primary); text-decoration: underline; cursor: pointer; font: inherit; }
+
 /* ---------- 모달 / 토스트 ---------- */
 .modal {
   position: fixed; inset: 0; background: rgba(15, 20, 30, .45); z-index: 50;

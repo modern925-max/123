@@ -95,6 +95,7 @@
           <button class="btn" data-action="loadSample">예시 데이터로 둘러보기</button>
           <label class="btn">⬆ CSV 기록 불러오기<input type="file" accept=".csv,text/csv" data-change="importCsv" hidden></label>
         </div>
+        <p class="muted small">엑셀로 기록해 오셨다면 <button class="link-btn" data-action="csvTemplate">CSV 양식</button>을 받아 그 형식대로 정리해 불러오세요.</p>
         ${PRIVACY_NOTICE}
         <p class="muted small">모든 자료는 이 브라우저에만 저장됩니다. 설정 메뉴에서 백업 파일로 내보낼 수 있어요.</p>
       </section>`;
@@ -849,6 +850,7 @@
           <label class="btn primary">⬆ CSV 기록 불러오기<input type="file" accept=".csv,text/csv" data-change="importCsv" hidden></label>
           <button class="btn" data-action="csvTemplate">⬇ CSV 양식 받기</button>
         </div>
+        ${csvGuide()}
       </section>
       <section class="card tip">
         <h3>사용 순서</h3>
@@ -915,10 +917,32 @@
     catch (e) { return new TextDecoder('euc-kr').decode(buf); }
   }
 
+  function csvGuide() {
+    const li = (k, v) => `<li><b>${k}</b> ${v}</li>`;
+    return `<details class="csv-guide">
+      <summary>CSV 작성 안내 (열 이름과 적는 법)</summary>
+      <ul>
+        ${li('학생', '가명 (예: 학생A). 없는 학생은 새로 만듭니다.')}
+        ${li('표적행동', '행동 이름 (예: 소리 지르기). 없는 행동은 새로 만듭니다.')}
+        ${li('날짜', '2026-04-01, 2026-04-01 (수), 2026. 4. 1. 모두 됩니다. <b>필수</b>')}
+        ${li('시작시간 · 종료시간', '9:10, 13:16, 오전 10:40, 오후 1:05')}
+        ${li('지속시간', '0시 05분, 5분 30초, 90초 등. 비어 있으면 시작~종료 시간으로 계산합니다.')}
+        ${li('강도', '1~5 숫자')}
+        ${li('장소 · 활동 · 행동 묘사 · 메모', '자유롭게 (실명 대신 \'친구1\', \'담임\'처럼)')}
+        ${li('선행사건', A.ANTECEDENTS.filter(x => x.code !== 'other').map(x => esc(x.label)).join(' / '))}
+        ${li('후속결과', A.CONSEQUENCES.filter(x => x.code !== 'other').map(x => esc(x.label)).join(' / '))}
+        ${li('추정 기능', Object.values(A.FUNCTIONS).map(esc).join(' / '))}
+      </ul>
+      <p class="muted small">선행사건·후속결과가 여러 개면 세미콜론(;)으로 구분합니다. 목록에 없는 내용은 상세란에 그대로 들어갑니다. 엑셀에서는 [다른 이름으로 저장 → CSV]로 저장하세요.</p>
+    </details>`;
+  }
+
   function csvPreview(fileName, res) {
     if (res.error) {
       openModal(`<h2>CSV를 불러올 수 없습니다</h2><p class="warn">${esc(res.error)}</p>
-        <p class="muted small">'CSV 양식 받기'로 받은 파일의 첫 줄과 같은 열 이름을 쓰면 됩니다.</p>`);
+        <p class="muted small">CSV 양식의 첫 줄과 같은 열 이름을 쓰면 됩니다.</p>
+        <div class="row"><button class="btn primary" data-action="csvTemplate">⬇ CSV 양식 받기</button></div>
+        ${csvGuide()}`);
       return;
     }
     const realNames = res.students.filter(s => U.looksLikeRealName(s.name));
